@@ -1,0 +1,2 @@
+[minecraft_server]
+minecraft ansible_host=10.0.1.35 ansible_user=ubuntu ansible_ssh_private_key_file=~/ssh_keys/cs312-laptop-key
