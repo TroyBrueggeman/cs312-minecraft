@@ -1,0 +1,71 @@
+name: Build and Push to ECR
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: cs312-op3-ecr
+
+jobs:
+  build-test-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Pull upstream Minecraft image
+        run: |
+          docker pull itzg/minecraft-server:latest
+
+      - name: Smoke test
+        run: |
+          docker run -d --name mc-test \
+            -e EULA=TRUE \
+            -e MEMORY=512M \
+            -p 25565:25565 \
+            itzg/minecraft-server:latest
+
+          echo "Waiting for Minecraft to initialize..."
+          SUCCESS=false
+          for i in $(seq 1 12); do
+            sleep 10
+            echo "--- Check $i/12 ---"
+            docker logs mc-test 2>&1 | tail -5
+            if docker logs mc-test 2>&1 | grep -q "Done"; then
+              echo "Smoke test passed!"
+              SUCCESS=true
+              break
+            fi
+          done
+
+          docker stop mc-test
+          docker rm mc-test
+
+          if [ "$SUCCESS" != "true" ]; then
+            echo "Smoke test failed: server never logged 'Done' within 120 seconds"
+            exit 1
+          fi
+
+      - name: Tag and push to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker tag itzg/minecraft-server:latest \
+            $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:${{ github.ref_name }}
+          docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:${{ github.ref_name }}
