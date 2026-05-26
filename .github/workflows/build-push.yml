@@ -7,7 +7,7 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  ECR_REPOSITORY: cs312-op3-ecr
+  ECR_REPOSITORY: cs312-op4-ecr
 
 jobs:
   build-test-push:
