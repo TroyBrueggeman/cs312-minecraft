@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minecraft
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minecraft
+  template:
+    metadata:
+      labels:
+        app: minecraft
+    spec:
+      imagePullSecrets:
+        - name: ecr-secret
+      initContainers:
+        - name: world-restore
+          image: amazon/aws-cli:latest
+          command:
+            - sh
+            - -c
+            - |
+              if [ -d /data/world ] && [ "$(ls -A /data/world)" ]; then
+                echo "World data already exists, skipping restore."
+              else
+                echo "Restoring world from S3..."
+                aws s3 sync s3://cs312-op4-minecraft-world-659800275273983456/world /data/world
+              fi
+          volumeMounts:
+            - name: world-data
+              mountPath: /data
+      containers:
+        - name: minecraft
+          image: 839583540569.dkr.ecr.us-east-1.amazonaws.com/cs312-op4-ecr:v1.0.1
+          env:
+            - name: EULA
+              valueFrom:
+                secretKeyRef:
+                  name: minecraft-secret
+                  key: eula
+            - name: MOTD
+              valueFrom:
+                secretKeyRef:
+                  name: minecraft-secret
+                  key: motd
+            - name: ONLINE_MODE
+              valueFrom:
+                secretKeyRef:
+                  name: minecraft-secret
+                  key: online-mode
+            - name: LEVEL
+              valueFrom:
+                secretKeyRef:
+                  name: minecraft-secret
+                  key: level-name
+          ports:
+            - containerPort: 25565
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "1500m"
+          volumeMounts:
+            - name: world-data
+              mountPath: /data
+          startupProbe:
+            tcpSocket:
+              port: 25565
+            failureThreshold: 30
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 25565
+            periodSeconds: 20
+            failureThreshold: 3
+          readinessProbe:
+            tcpSocket:
+              port: 25565
+            periodSeconds: 10
+            failureThreshold: 3
+      volumes:
+        - name: world-data
+          persistentVolumeClaim:
+            claimName: minecraft-world-pvc
