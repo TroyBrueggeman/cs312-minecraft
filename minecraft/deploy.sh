@@ -32,9 +32,13 @@ VOLUME=$(sudo kubectl get pvc minecraft-world-pvc \
   -o jsonpath='{.spec.volumeName}' \
   --kubeconfig=/etc/rancher/k3s/k3s.yaml)
 
-BACKUP_CMD="0 * * * * sudo aws s3 sync /var/lib/rancher/k3s/storage/${VOLUME}_default_minecraft-world-pvc/world s3://${S3_BUCKET}/world"
+BACKUP_PATH="/var/lib/rancher/k3s/storage/${VOLUME}_default_minecraft-world-pvc/world"
+BACKUP_CMD="0 * * * * sudo aws s3 sync ${BACKUP_PATH} s3://${S3_BUCKET}/world"
 
-(sudo crontab -l 2>/dev/null; echo "${BACKUP_CMD}") | sudo crontab -
+echo "Adding cron job: ${BACKUP_CMD}"
+
+EXISTING=$(sudo crontab -l 2>/dev/null)
+echo "${EXISTING} ${BACKUP_CMD}" | sudo crontab -
 
 echo "==> Cron job set up. Current crontab:"
 sudo crontab -l
