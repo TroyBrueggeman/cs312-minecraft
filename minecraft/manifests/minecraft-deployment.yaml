@@ -54,31 +54,51 @@ spec:
                 secretKeyRef:
                   name: minecraft-secret
                   key: level-name
+            - name: JVM_DD_OPTS
+              value: "true"
           ports:
             - containerPort: 25565
           resources:
             requests:
-              memory: "1Gi"
-              cpu: "500m"
+              memory: "4Gi"
+              cpu: "1000m"
             limits:
-              memory: "2Gi"
+              memory: "6Gi"
               cpu: "1500m"
           volumeMounts:
             - name: world-data
               mountPath: /data
           startupProbe:
-            tcpSocket:
-              port: 25565
+            exec:
+              command:
+                - mc-monitor
+                - status
+                - --host
+                - localhost
+                - --port
+                - "25565"
             failureThreshold: 30
             periodSeconds: 10
           livenessProbe:
-            tcpSocket:
-              port: 25565
+            exec:
+              command:
+                - mc-monitor
+                - status
+                - --host
+                - localhost
+                - --port
+                - "25565"
             periodSeconds: 20
             failureThreshold: 3
           readinessProbe:
-            tcpSocket:
-              port: 25565
+            exec:
+              command:
+                - mc-monitor
+                - status
+                - --host
+                - localhost
+                - --port
+                - "25565"
             periodSeconds: 10
             failureThreshold: 3
       volumes:
